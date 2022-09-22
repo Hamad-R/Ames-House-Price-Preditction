@@ -1,39 +1,656 @@
-# History files
-.Rhistory
-.Rapp.history
+getwd()
+setwd("C:/Users/Mohd Hamad/OneDrive/Desktop/Induction")
+library(readxl)
+library(ggplot2)
+library(psych)
+library(tidyverse)
+library(dplyr)
+library(skimr)
+library(summarytools)
+library(VIM)
+library(Hmisc)
+library(imputeTS)
+library(dplyr)
+library(outliers)
+library(ggthemes)
+library(ggsci)
+library(ggpubr)
+library(hexbin)
+library(ggridges)
+library(dummies)
+library(gganimate)
+library(gifski)
+library(knitr)
+#get rid of scientific notation throughout
+#by setting an immensely high integer penalty
+options(scipen = 999999)
 
-# Session Data files
-.RData
 
-# User-specific files
-.Ruserdata
+### Before heading towards the data creating a mode function as we might need it
+X <- c(1, 2, 2, 3, 5, 2, 6, 2)
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 
-# Example code in package build process
-*-Ex.R
+##Read in the Data
+ames_org <- read_xlsx("ames_train.xlsx")
 
-# Output files from R CMD build
-/*.tar.gz
+## converting ames_train to ames so as to create duplicate data and working on a dataframe is easy 
+ames = data.frame(ames_original)
 
-# Output files from R CMD check
-/*.Rcheck/
+## descriptive stats
+summary(ames)
+glimpse(ames)
+skim(ames)
+describe(ames)
 
-# RStudio files
-.Rproj.user/
+## Describe table print to attach in appendix
 
-# produced vignettes
-vignettes/*.html
-vignettes/*.pdf
+my_summary <- dfSummary(ames)
+my_describe <- descr(ames)
+print(my_summary, file = "Describe_ames.txt", style = "grid")
+print(my_describe, file = "Describe_ames.txt", append = TRUE)
 
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
-.httr-oauth
+#A histogram of SalePrice just to see how the data is distributed
 
-# knitr and R markdown default cache directories
-*_cache/
-/cache/
+ames %>%
+  ggplot(aes(SalePrice)) +
+  geom_histogram(binwidth = 100000, fill = "#97B3C6") +
+  theme_bw()
 
-# Temporary files created by R markdown
-*.utf8.md
-*.knit.md
+#correlation
+ames %>%
+  select(where(is.numeric)) %>%
+  cor()
+#another correlation test
+ames %>%
+  select(where(is.numeric)) %>%
+  corr.test()
 
-# R Environment Variables
-.Renviron
+corr.test(ames_2, ames$SalePrice)
+
+
+## changing a column name
+colnames(ames)[colnames(ames) == "Functio.l"] <- "Functional"
+
+
+##Split the data into types of variables
+###converting categorical columns to factors
+
+ames_categorical = ames %>%
+  select(MS.SubClass, MS.Zoning, Street, Alley, Lot.Shape, Land.Contour, Utilities, Lot.Config,
+         Land.Slope, Neighborhood, Condition.1, Condition.2, Bldg.Type, House.Style,
+         Overall.Qual, Overall.Cond, Roof.Style, Roof.Matl, Exterior.1st, Exterior.2nd, Mas.Vnr.Type,
+         Exter.Qual, Exter.Cond, Foundation, Bsmt.Qual, Bsmt.Cond, Bsmt.Exposure, BsmtFin.Type.1,
+         BsmtFin.Type.2, Heating, Heating.QC, Central.Air, Electrical, Kitchen.Qual, Functional, 
+         Fireplace.Qu, Garage.Type, Garage.Finish, Garage.Qual, Garage.Cond, Paved.Drive, 
+         Pool.QC, Fence, Misc.Feature, Sale.Type, Sale.Condition) %>%
+  mutate(across(!MS.Zoning, as.factor))
+
+###converting continuous and discrete data columns to numerical data
+
+ames_numerical = ames %>%
+  select(Lot.Frontage, Lot.Area, Mas.Vnr.Area, BsmtFin.SF.1, BsmtFin.SF.2, Bsmt.Unf.SF, 
+         Total.Bsmt.SF, X1st.Flr.SF, X2nd.Flr.SF, Low.Qual.Fin.SF, Gr.Liv.Area, Garage.Area, 
+         Wood.Deck.SF, Open.Porch.SF, Enclosed.Porch, X3Ssn.Porch, Screen.Porch, Pool.Area, 
+         Misc.Val, Year.Built, Year.Remod.Add, Bsmt.Full.Bath, Bsmt.Half.Bath, Full.Bath, 
+         Half.Bath, Bedroom.AbvGr, Kitchen.AbvGr, TotRms.AbvGrd, Fireplaces, Garage.Yr.Blt, 
+         Garage.Cars, Mo.Sold, Yr.Sold, SalePrice) %>%
+  mutate(across(!Lot.Frontage, as.numeric))
+
+### creating third variable "SalePrice" as it is the primary variable
+SalePrice = ames$SalePrice
+
+###Remove outcome from ames_numerical
+ames_numerical = ames_numerical %>%
+  dplyr::select(., -SalePrice)
+
+###Check Missing Data in Categorical
+aggr(ames_categorical, plot = F)
+
+###convert ames_categorical to character to replace na values easily
+
+ames_categorical = ames_categorical %>%
+  select(MS.SubClass, MS.Zoning, Street, Alley, Lot.Shape, Land.Contour, Utilities, Lot.Config,
+         Land.Slope, Neighborhood, Condition.1, Condition.2, Bldg.Type, House.Style,
+         Overall.Qual, Overall.Cond, Roof.Style, Roof.Matl, Exterior.1st, Exterior.2nd, Mas.Vnr.Type,
+         Exter.Qual, Exter.Cond, Foundation, Bsmt.Qual, Bsmt.Cond, Bsmt.Exposure, BsmtFin.Type.1,
+         BsmtFin.Type.2, Heating, Heating.QC, Central.Air, Electrical, Kitchen.Qual, Functional, 
+         Fireplace.Qu, Garage.Type, Garage.Finish, Garage.Qual, Garage.Cond, Paved.Drive, 
+         Pool.QC, Fence, Misc.Feature, Sale.Type, Sale.Condition) %>%
+  mutate(across(!MS.Zoning, as.character))
+
+###Replace NA where appropriate
+ames_categorical <- ames_categorical %>%
+  mutate(Alley = replace_na(Alley,"No Alley Access")
+         ,Mas.Vnr.Type = replace_na(Mas.Vnr.Type, "None")
+         ,Bsmt.Qual = replace_na(Bsmt.Qual,"No Bsmt")
+         ,Bsmt.Cond = replace_na(Bsmt.Cond,"No Bsmt")
+         ,Bsmt.Exposure = replace_na(Bsmt.Exposure,"No Bsmt")
+         ,BsmtFin.Type.1 = replace_na(BsmtFin.Type.1,"No Bsmt")
+         ,BsmtFin.Type.2 = replace_na(BsmtFin.Type.2,"No Bsmt")
+         ,Electrical = replace_na(Electrical, "No Electrical")
+         ,Fireplace.Qu = replace_na(Fireplace.Qu,"No Fireplace")
+         ,Garage.Type = replace_na(Garage.Type,"No Garage")
+         ,Garage.Finish = replace_na(Garage.Finish,"No Garage")
+         ,Garage.Qual = replace_na(Garage.Qual,"No Garage")
+         ,Garage.Cond = replace_na(Garage.Cond,"No Garage")
+         ,Pool.QC = replace_na(Pool.QC,"No Pool")
+         ,Fence = replace_na(Fence,"No Fence")
+         ,Misc.Feature = replace_na(Misc.Feature,"None"))
+
+### Convert categorical values back to factor
+
+ames_categorical = ames_categorical %>%
+  select(MS.SubClass, MS.Zoning, Street, Alley, Lot.Shape, Land.Contour, Utilities, Lot.Config,
+         Land.Slope, Neighborhood, Condition.1, Condition.2, Bldg.Type, House.Style,
+         Overall.Qual, Overall.Cond, Roof.Style, Roof.Matl, Exterior.1st, Exterior.2nd, Mas.Vnr.Type,
+         Exter.Qual, Exter.Cond, Foundation, Bsmt.Qual, Bsmt.Cond, Bsmt.Exposure, BsmtFin.Type.1,
+         BsmtFin.Type.2, Heating, Heating.QC, Central.Air, Electrical, Kitchen.Qual, Functional, 
+         Fireplace.Qu, Garage.Type, Garage.Finish, Garage.Qual, Garage.Cond, Paved.Drive, 
+         Pool.QC, Fence, Misc.Feature, Sale.Type, Sale.Condition) %>%
+  mutate(across(!Street, as.factor))
+
+### again Check Missing Data in Categorical
+aggr(ames_categorical, plot = F)
+
+### running a summary stat again just to have a brief view on categorical data
+summary(ames_categorical)
+
+# Overall Quality
+
+levels(ames$Overall.Qual)
+
+#changing overall quality to character to change one inappropriate factor level 
+#and then back to factor
+
+ames$Overall.Qual = as.character(ames$Overall.Qual)
+ames$Overall.Qual[ames$Overall.Qual == 11] <- NA
+ames$Overall.Qual[is.na(ames$Overall.Qual)] <- mode(ames$Overall.Qual)
+aggr(ames$Overall.Qual, plot = F)
+ames$Overall.Qual = as.factor(ames$Overall.Qual)
+
+
+### Summary and plots for each column individually just to see if there are any
+### outliers and treat them 
+
+## Lot Frontage treatment
+summary(ames_numerical$Lot.Frontage)
+plot.default(ames_numerical$Lot.Frontage)
+boxplot.default(ames_numerical$Lot.Frontage)
+
+#removing anything above 150 sq.ft
+ames_numerical$Lot.Frontage[ames_numerical$Lot.Frontage > 150] <- NA
+
+#replacing them with mean 
+ames_numerical$Lot.Frontage[is.na(ames_numerical$Lot.Frontage)] <- mean.default(ames_numerical$Lot.Frontage, na.rm = TRUE)
+plot(density(ames_numerical$Lot.Frontage), xlim=c(0, 300)) #a view at skewness and kurtosis of the data
+
+
+##Lot Area Treatment
+summary(ames_numerical$Lot.Area)
+plot.default(ames_numerical$Lot.Area)
+plot(density(ames_numerical$Lot.Area), xlim=c(0, 2500))
+
+#removing anything above 30000 sq.ft
+ames_numerical$Lot.Area[ames_numerical$Lot.Area > 30000] <- NA
+
+#removing anything below 10
+ames_numerical$Lot.Area[ames_numerical$Lot.Area < 1000] <- NA
+aggr(ames_numerical$Lot.Area, plot = F)
+
+#replacing the values with the mean as the data
+ames_numerical$Lot.Area[is.na(ames_numerical$Lot.Area)] <- mean(ames_numerical$Lot.Area, na.rm = TRUE)
+
+
+### Mas.Vnr.Area treatment
+summary(ames_numerical$Mas.Vnr.Area)
+plot.default(ames_numerical$Mas.Vnr.Area)
+
+#removing anything above 800sq ft
+ames_numerical$Mas.Vnr.Area[ames_numerical$Mas.Vnr.Area > 800] <- NA
+
+#replacing NA with 0 as na means no masonry veneer area
+ames_numerical$Mas.Vnr.Area[is.na(ames_numerical$Mas.Vnr.Area)] <- mean(ames_numerical$Mas.Vnr.Area, na.rm = TRUE)
+aggr(ames_numerical$Mas.Vnr.Area, plot = F)
+
+
+## treating the remaining na columns which should be 0 in place of na
+
+ames_numerical = ames_numerical %>%
+  mutate(.,BsmtFin.SF.1 = replace_na(BsmtFin.SF.1,0),
+         BsmtFin.SF.2 = replace_na(BsmtFin.SF.2,0),
+         Bsmt.Unf.SF = replace_na(Bsmt.Unf.SF,0),
+         Total.Bsmt.SF = replace_na(Total.Bsmt.SF,0),
+         Bsmt.Full.Bath = replace_na(Bsmt.Full.Bath,0),
+         Bsmt.Half.Bath = replace_na(Bsmt.Half.Bath,0),
+         Garage.Cars = replace_na(Garage.Cars,0),
+         Garage.Area = replace_na(Garage.Area,0))
+
+##If no garage, year build should be put into garage year
+
+ames_numerical = ames_numerical %>%
+  mutate(.,Garage.Yr.Blt = replace_na(Year.Built))
+
+#summary of numerical columns to see if any column contains outliers
+summary(ames_numerical)
+
+###checking outliers in X1st.Flr.SF
+summary(ames_numerical$X1st.Flr.SF)
+plot.default(ames_numerical$X1st.Flr.SF)
+
+#removing anything above 2500 and replacing with mean
+ames_numerical$X1st.Flr.SF[ames_numerical$X1st.Flr.SF > 2500] <- NA
+ames_numerical$X1st.Flr.SF[is.na(ames_numerical$X1st.Flr.SF)] <- mean(ames_numerical$X1st.Flr.SF, na.rm = TRUE)
+aggr(ames_numerical$X1st.Flr.SF, plot = F)
+
+###checking outliers in X2nd.Flr.SF
+summary(ames_numerical$X2nd.Flr.SF)
+plot.default(ames_numerical$X2nd.Flr.SF)
+
+#removing anything above 1500 and replacing with mean
+ames_numerical$X2nd.Flr.SF[ames_numerical$X2nd.Flr.SF > 1500] <- NA
+ames_numerical$X2nd.Flr.SF[is.na(ames_numerical$X2nd.Flr.SF)] <- mean(ames_numerical$X1st.Flr.SF, na.rm = TRUE)
+
+
+###checking outliers in Low.Qual.Fin.SF
+summary(ames_numerical$Low.Qual.Fin.SF)
+plot.default(ames_numerical$Low.Qual.Fin.SF)
+
+#removing anything above 600 and replacing with mean
+ames_numerical$Low.Qual.Fin.SF[ames_numerical$Low.Qual.Fin.SF > 600] <- NA
+ames_numerical$Low.Qual.Fin.SF[is.na(ames_numerical$Low.Qual.Fin.SF)] <- mean(ames_numerical$Low.Qual.Fin.SF, na.rm = TRUE)
+
+
+###checking outliers in Gr.Liv.Area
+summary(ames_numerical$Gr.Liv.Area)
+plot.default(ames_numerical$Gr.Liv.Area)
+
+#removing anything above 3000 and replacing with mean
+ames_numerical$Gr.Liv.Area[ames_numerical$Gr.Liv.Area > 3000] <- NA
+ames_numerical$Gr.Liv.Area[is.na(ames_numerical$Gr.Liv.Area)] <- mean(ames_numerical$Gr.Liv.Area, na.rm = TRUE)
+aggr(ames_numerical$Gr.Liv.Area, plot = F)
+
+###checking outliers in Garage.Area
+summary(ames_numerical$Garage.Area)
+plot.default(ames_numerical$Garage.Area)
+
+#removing anything above 1000 and replacing with mean
+ames_numerical$Garage.Area[ames_numerical$Garage.Area > 1000] <- NA
+ames_numerical$Garage.Area[is.na(ames_numerical$Garage.Area)] <- mean(ames_numerical$Garage.Area, na.rm = TRUE)
+
+
+###checking outliers in Wood.Deck.SF
+summary(ames_numerical$Wood.Deck.SF)
+plot.default(ames_numerical$Wood.Deck.SF)
+
+#removing anything above 550 and replacing with mean
+ames_numerical$Wood.Deck.SF[ames_numerical$Wood.Deck.SF > 550] <- NA
+ames_numerical$Wood.Deck.SF[is.na(ames_numerical$Wood.Deck.SF)] <- mean(ames_numerical$Wood.Deck.SF, na.rm = TRUE)
+aggr(ames_numerical$Wood.Deck.SF, plot = F)
+
+###checking outliers in Open.Porch.SF
+summary(ames_numerical$Open.Porch.SF)
+plot.default(ames_numerical$Open.Porch.SF)
+
+#removing anything above 300 and replacing with mean
+ames_numerical$Open.Porch.SF[ames_numerical$Open.Porch.SF > 300] <- NA
+ames_numerical$Open.Porch.SF[is.na(ames_numerical$Open.Porch.SF)] <- mean(ames_numerical$Open.Porch.SF, na.rm = TRUE)
+aggr(ames_numerical$Open.Porch.SF, plot = F)
+
+
+###checking outliers in Enclosed.Porch
+summary(ames_numerical$Enclosed.Porch)
+plot.default(ames_numerical$Enclosed.Porch)
+
+#removing anything above 300 and replacing with mean
+ames_numerical$Enclosed.Porch[ames_numerical$Enclosed.Porch > 300] <- NA
+ames_numerical$Enclosed.Porch[is.na(ames_numerical$Enclosed.Porch)] <- mean(ames_numerical$Enclosed.Porch, na.rm = TRUE)
+aggr(ames_numerical$Enclosed.Porch, plot = F)
+
+
+###checking outliers in X3Ssn.Porch
+summary(ames_numerical$X3Ssn.Porch)
+plot.default(ames_numerical$X3Ssn.Porch)
+
+#removing anything above 400 and replacing with mean
+ames_numerical$X3Ssn.Porch[ames_numerical$X3Ssn.Porch > 400] <- NA
+ames_numerical$X3Ssn.Porch[is.na(ames_numerical$X3Ssn.Porch)] <- mean(ames_numerical$X3Ssn.Porch, na.rm = TRUE)
+aggr(ames_numerical$X3Ssn.Porch, plot = F)
+
+
+###checking outliers in Screen.Porch
+summary(ames_numerical$Screen.Porch)
+plot.default(ames_numerical$Screen.Porch)
+
+#removing anything above 300 and replacing with mean
+ames_numerical$Screen.Porch[ames_numerical$Screen.Porch > 300] <- NA
+ames_numerical$Screen.Porch[is.na(ames_numerical$Screen.Porch)] <- mean(ames_numerical$Screen.Porch, na.rm = TRUE)
+aggr(ames_numerical$Screen.Porch, plot = F)
+
+
+###checking outliers in Misc.Val
+summary(ames_numerical$Misc.Val)
+plot.default(ames_numerical$Misc.Val)
+
+#removing anything above 5000 and replacing with mean
+ames_numerical$Misc.Val[ames_numerical$Misc.Val > 5000] <- NA
+ames_numerical$Misc.Val[is.na(ames_numerical$Misc.Val)] <- mean(ames_numerical$Misc.Val, na.rm = TRUE)
+
+
+###checking outliers in Year.Remod.Add
+summary(ames_numerical$Year.Remod.Add)
+plot.default(ames_numerical$Year.Remod.Add)
+
+#removing anything above 2021 and replacing with mode
+ames_numerical$Year.Remod.Add[ames_numerical$Year.Remod.Add > 2021] <- NA
+ames_numerical$Year.Remod.Add[is.na(ames_numerical$Year.Remod.Add)] <- mode(ames_numerical$Year.Remod.Add)
+
+
+###checking outliers in Bedroom.AbvGr
+summary(ames_numerical$Bedroom.AbvGr)
+plot.default(ames_numerical$Bedroom.AbvGr)
+
+#removing anything above 6 bedrooms and replacing with mode
+ames_numerical$Bedroom.AbvGr[ames_numerical$Bedroom.AbvGr > 6] <- NA
+ames_numerical$Bedroom.AbvGr[is.na(ames_numerical$Bedroom.AbvGr)] <- mode(ames_numerical$Bedroom.AbvGr)
+aggr(ames_numerical$Bedroom.AbvGr, plot = F)
+
+
+###checking outliers in Kitchen.AbvGr
+summary(ames_numerical$Kitchen.AbvGr)
+plot.default(ames_numerical$Kitchen.AbvGr)
+
+#removing anything above 2 kitchen and replacing with mode
+ames_numerical$Kitchen.AbvGr[ames_numerical$Kitchen.AbvGr > 2] <- NA
+ames_numerical$Kitchen.AbvGr[is.na(ames_numerical$Kitchen.AbvGr)] <- mode(ames_numerical$Kitchen.AbvGr)
+
+
+###checking outliers in TotRms.AbvGrd
+summary(ames_numerical$TotRms.AbvGrd)
+plot.default(ames_numerical$TotRms.AbvGrd)
+
+#removing anything above 12 rooms and replacing with mode
+ames_numerical$TotRms.AbvGrd[ames_numerical$TotRms.AbvGrd > 12] <- NA
+ames_numerical$TotRms.AbvGrd[is.na(ames_numerical$TotRms.AbvGrd)] <- mode(ames_numerical$TotRms.AbvGrd)
+
+
+###checking outliers in Fireplaces
+summary(ames_numerical$Fireplaces)
+plot.default(ames_numerical$Fireplaces)
+
+#removing anything above 3 fireplaces and replacing with mode
+ames_numerical$Fireplaces[ames_numerical$Fireplaces > 2.5] <- NA
+ames_numerical$Fireplaces[is.na(ames_numerical$Fireplaces)] <- mode(ames_numerical$Fireplaces)
+aggr(ames_numerical$Fireplaces, plot = F)
+
+
+###checking outliers in Garage.Yr.Blt
+summary(ames_numerical$Garage.Yr.Blt)
+plot.default(ames_numerical$Garage.Yr.Blt)
+
+#removing anything below 1800 year built and replacing with mode
+ames_numerical$Garage.Yr.Blt[ames_numerical$Garage.Yr.Blt < 1800] <- NA
+ames_numerical$Garage.Yr.Blt[is.na(ames_numerical$Garage.Yr.Blt)] <- mode(ames_numerical$Garage.Yr.Blt)
+
+
+###checking outliers in Garage.Cars
+summary(ames_numerical$Garage.Cars)
+plot.default(ames_numerical$Garage.Cars)
+
+#removing anything above 4 car space and replacing with mode
+ames_numerical$Garage.Cars[ames_numerical$Garage.Cars > 4] <- NA
+ames_numerical$Garage.Cars[is.na(ames_numerical$Garage.Cars)] <- mode(ames_numerical$Garage.Cars)
+
+
+
+###Outcome treatment that is our salesprice 
+summary(SalePrice)
+plot.default(SalePrice) #scipen = 10
+
+#removing anything above 3000000 and replacing with mean
+SalePrice[SalePrice > 600000] <- NA
+SalePrice[SalePrice < 50000] <- NA
+SalePrice[is.na(SalePrice)] <- mean(SalePrice, na.rm = TRUE)
+aggr(SalePrice, plot = F)
+
+
+##Slap the three back together
+ames = cbind(ames_categorical, ames_numerical, SalePrice)
+
+## running the pca test
+ames_2 = dummy.data.frame(ames)
+dim(ames_2)
+ames_3 = scale(ames_2)
+prc_ames = prcomp(ames_3)
+
+#pca plot
+biplot(prc_ames, scale = 0)
+biplot(prc_ames, scale = 0, expand = 30)
+summary(prc_ames)
+
+### Changins factor levels which will be required for visualizations
+
+# MS.Zoning
+class(ames$MS.Zoning)
+levels(ames$MS.Zoning)
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "A (agr)"] <- "Agriculture"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "C (all)"] <- "Commercial"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "FV"] <- "Floating Village Residenial"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "I (all)"] <- "Industrial"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "RH"] <- "Residential (High Density)"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "RL"] <- "Residential (Low Density)"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "RP"] <- "Residential (Low Density park)"
+levels(ames$MS.Zoning)[levels(ames$MS.Zoning) == "RM"] <- "Residential (Medium Density)"
+
+# Street
+
+levels(ames$Street)
+levels(ames$Street)[levels(ames$Street) == "Grvl"] <- "Gravel"
+levels(ames$Street)[levels(ames$Street) == "Pave"] <- "Paved"
+
+# Alley
+
+levels(ames$Alley)
+levels(ames$Alley)[levels(ames$Alley) == "Grvl"] <- "Gravel"
+levels(ames$Alley)[levels(ames$Alley) == "Pave"] <- "Paved"
+ames$Alley <- factor(ames$Alley,levels = c("Gravel", "Paved", "No Alley Access"))
+
+# Lot Shape
+
+levels(ames$Lot.Shape)
+levels(ames$Lot.Shape) <- c("Slightly Irregular", "Moderately Irregular", "Irregular", "Regular")
+ames$Lot.Shape <- factor(ames$Lot.Shape, levels = c("Regular", "Slightly Irregular", "Moderately Irregular", "Irregular"))
+
+# Land Contour
+
+levels(ames$Land.Contour)
+levels(ames$Land.Contour) <- c("Banked", "Hillside", "Depression", "Near Flat")
+ames$Land.Contour <- factor(ames$Land.Contour, levels = c("Near Flat", "Banked", "Hillside", "Depression"))
+
+# Lot Config
+
+levels(ames$Lot.Config)
+levels(ames$Lot.Config) <- c("Corner Lot", "Cul-De-Sac", "Frontage on 2 sides"
+                             , "Frontage on 3 sides", "Inside Lot")
+ames$Lot.Config <- factor(ames$Lot.Config, levels = c("Inside Lot", 
+                                                      "Corner Lot", "Cul-De-Sac", 
+                                                      "Frontage on 2 sides", "Frontage on 3 sides"))
+# Overall Quality
+
+levels(ames$Overall.Qual)
+
+ames$Overall.Qual <- factor(ames$Overall.Qual, levels = c("1", "2", "3", "4", "5", "6", "7", 
+                                                          "8", "9", "10"))
+levels(ames$Overall.Qual) <- c("Very Poor", "Poor", "Fair", "Below Average", "Average", 
+                               "Above Average", "Good", "Very Good", "Excellent", "Very Excellent")
+
+# overall condition
+
+levels(ames$Overall.Cond)
+levels(ames$Overall.Cond) <- c("Very Poor", "Poor", "Fair", "Below Average", "Average", 
+                               "Above Average", "Good", "Very Good", "Excellent")
+
+# Garage Quality
+
+levels(ames$Garage.Qual)
+ames$Garage.Qual <- factor(ames$Garage.Qual, levels = c("Ex", "Gd", "TA", "Fa", "Po", "No Garage"))
+levels(ames$Garage.Qual) <- c("Excellent", "Good", "Typical/Average", "Fair", "Poor", "No Garage")
+
+# Garage Condition
+
+levels(ames$Garage.Cond)
+ames$Garage.Cond <- factor(ames$Garage.Cond, levels = c("Ex", "Gd", "TA", "Fa", "Po", "No Garage"))
+levels(ames$Garage.Cond) <- c("Excellent", "Good", "Typical/Average", "Fair", "Poor", "No Garage")
+
+# Sale type
+
+levels(ames$Sale.Condition)
+ames$Sale.Condition <- factor(ames$Sale.Condition, levels = c("Normal", "Abnorml", 
+                              "AdjLand", "Alloca", "Family", "Partial"))
+levels(ames$Sale.Condition) <- c("Normal Sale", "Abnormal Sale", "Adjoining Purchase",
+                                 "Allocation", "Sale B/W Family", "Incomplete Home")
+
+
+
+
+
+####
+# Visualizations
+####
+
+#A histogram of SalePrice just to see how the data is distributed
+
+ames %>%
+  ggplot(aes(SalePrice)) +
+  geom_histogram(binwidth = 100000, fill = "#97B3C6") +
+  theme_bw()
+
+# Visualization - 1
+
+ames %>%
+  ggplot(aes(Lot.Area, SalePrice))+
+  geom_point(aes(color = Lot.Shape, shape = Lot.Shape, size = 2, alpha = 0.5))+
+  geom_smooth(method = "lm")+
+  labs(title = "Sales Price in respect with Area and Shape", 
+       x = "Lot Area (sqft)", 
+       y = "Sale Price($)", 
+       caption="Ames Housing Data")+
+  coord_flip()+
+  theme_stata()+scale_fill_aaas()
+
+#doing a facet wrap to understand it in a better way
+ames %>%
+  ggplot(aes(Lot.Area, SalePrice))+
+  geom_point(aes(color = Lot.Shape, shape = Lot.Shape, size = 2, alpha = 0.5))+
+  geom_smooth(method = "lm", se = FALSE)+
+  facet_wrap(Lot.Shape~.)+
+  labs(title = "Sales Price in respect with Area and Shape", 
+     x = "Lot Area (sqft)", 
+     y = "Sale Price($)", 
+     caption="Ames Housing Data")+
+  coord_flip()
+  theme_stata()  
+  
+
+#visualization 2
+
+ames %>%
+  ggplot(aes(x = Overall.Qual, SalePrice, fill = Overall.Cond))+
+  geom_bar(stat = "identity",position = "dodge")+
+  labs(title="Sales Price with respect to overall Condition & Quality",
+       x="Overall Quality",y="Sales Price ($)",
+       caption="Ames Housing Data",fill="Overall Condition")+
+  theme_classic()+scale_fill_jco()
+
+# visualization 3
+
+ames %>%
+  ggplot(aes(SalePrice, Lot.Config))+
+  geom_density_ridges(aes(fill = Land.Contour), alpha = 0.3)+
+  labs(title="Sales Price with respect to Lot Configuration & Land Contour",
+       x="Sales Price ($)",y="Lot Configuration",
+       caption="Ames Housing Data",fill = "Land Contour")+
+  theme_bw()+
+  scale_fill_excel_new()
+
+#doing a facet wrap to understand it in a better way
+
+ames %>%
+  ggplot(aes(SalePrice, Lot.Config))+
+  geom_density_ridges(aes(fill = Land.Contour), alpha = 0.3)+
+  facet_wrap(Land.Contour~.)+
+  labs(title="Sales Price with respect to Lot Configuration & Land Contour",
+       x="Sales Price ($)",y="Lot Configuration",
+       caption="Ames Housing Data",fill = "Land Contour")+
+  theme_bw()+
+  scale_fill_excel_new()
+  
+
+#visualization 4
+
+ames %>%
+  ggplot(aes(x = Bedroom.AbvGr, y = SalePrice))+
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", color="white")+
+  scale_fill_distiller(palette = "Spectral", direction=-1)+
+  labs(title="Sales Price with respect to No of Bedrooms",
+       x="No of Bedrooms",y="Sales Price '$'",
+       caption="Ames Housing Data")+
+  theme_bw()
+
+#visualization 5
+ames %>%
+  ggplot(aes(Gr.Liv.Area, SalePrice))+
+  geom_smooth(aes(color = Garage.Qual), method = lm, se = FALSE, fullrange = TRUE) +
+  geom_point(aes(color = Garage.Qual), alpha = 0.5)+
+  labs(title = "Effect of Graded Living area with respect to Garage Quality on Sales Price",
+       x = " Graded living Area", y = "Sales Price", fill = " Garage Quality",
+       caption = "Ames Housing Data") +
+  theme_fivethirtyeight() +
+  scale_fill_pander()
+
+#facet_grid of the above plot
+ames %>%
+  ggplot(aes(Gr.Liv.Area, SalePrice))+
+  geom_smooth(aes(color = Garage.Qual), method = lm, se = FALSE, fullrange = TRUE) +
+  geom_point(aes(color = Garage.Qual), alpha = 0.5)+
+  labs(title = "Effect of Graded Living area with respect to Garage Quality on Sales Price",
+       x = " Graded living Area", y = "Sales Price", fill = " Garage Quality",
+       caption = "Ames Housing Data") +
+  facet_grid(Garage.Qual~.)  +
+  theme_fivethirtyeight() +
+  scale_fill_pander()
+
+### Visualisation 6 (animation)
+
+#plotting the ggplot for animation
+
+graph = ames %>%
+  ggplot(aes(Mas.Vnr.Area, SalePrice, color = Mas.Vnr.Type)) +
+  geom_point(alpha = 0.7) +
+  theme_fivethirtyeight() +
+  scale_size(range=c(2,12), guide="none") +
+  scale_x_log10() +
+  labs(title = "Sales price change over the years with respect to masonry veneer area and type",
+       x = "masonry veneer area ( sqft. )",
+       y = "Sales Price",
+       caption = "Ames Housing Data",
+       color = "masonry veneer type") +
+  theme(axis.title = element_text(),
+        text = element_text(family = "Rubik"),
+        legend.text=element_text(size=10))
+
+# Setting up the animation on which it would run 
+
+graph1.animation = graph +
+  transition_time(as.integer(ames$Yr.Sold)) +
+  labs(subtitle = "Yr.Sold: {frame_time}") +
+  shadow_wake(wake_length = 0.1)
+
+# running and renerring the animation
+
+animate(plot = graph1.animation, height = 500, width = 800, fps = 45, duration = 20,
+        end_pause = 70, res = 100, renderer = gifski_renderer())
+
+
